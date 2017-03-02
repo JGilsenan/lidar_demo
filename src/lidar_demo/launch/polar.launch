@@ -1,0 +1,12 @@
+<launch>
+
+  <node pkg="polar_scan_matcher" type="psm_node" name="psm_node" output="screen">
+    <param name="max_error" value="0.20"/>
+    <param name="search_window" value="100"/>
+    <param name="min_valid_points" value="150"/>
+  </node>
+
+  <node pkg="tf" type="static_transform_publisher" name="base_link_to_laser" 
+    args="0.0 0.0 0.0 0 0 1.5708 /base_link /laser 40" />
+
+</launch>

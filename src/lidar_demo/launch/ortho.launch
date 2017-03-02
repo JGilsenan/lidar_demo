@@ -1,0 +1,12 @@
+<launch>
+
+  <node pkg="tf" type="static_transform_publisher" name="world_to_ortho" 
+    args="0.0 0.0 0.0 0.0 0.0 0.0 /world /base_ortho 40" /> 
+
+  <node pkg="laser_ortho_projector" type="laser_ortho_projector_node" name="laser_ortho_projector" 
+    output="screen">
+    <param name="use_imu" type="bool" value="false"/>
+
+  </node>
+
+</launch>

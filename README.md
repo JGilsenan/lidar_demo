@@ -6,8 +6,8 @@
       i) Create directories: mkdir -p ~/<workspace name>/src
       ii) Initialize it as a catkin tools workspace (different than tutorials!): catkin init
 
-3) Create a ROS package:
-    
+3) install csm: sudo apt-get install ros-indigo-csm
+
 
 
 

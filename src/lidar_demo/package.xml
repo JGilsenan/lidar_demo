@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>lidar_demo</name>
+  <version>0.0.0</version>
+  <description>LIDAR DEMO!!!</description>
+  <maintainer email="josephpgilsenan@gmail.com">joe</maintainer>
+  <license>BSD</license>
+  <author email="josephpgilsenan@gmail.com">joe</author> >
+
+
+  <buildtool_depend>catkin</buildtool_depend>
+    
+  <depend>roscpp</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  
+  <test_depend>rosunit</test_depend>
+
+</package>
