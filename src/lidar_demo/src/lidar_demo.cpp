@@ -80,7 +80,7 @@ void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
 	scan_msg scan;
 	for(int i = 0; i < numSects; i++){
-		if(isnan(msg->ranges[i]) || isinf(msg->ranges[i])){
+		if(std::isnan(msg->ranges[i]) || std::isinf(msg->ranges[i])){
 			scan.scan.push_back(0);
 		} else {
 			scan.scan.push_back(msg->ranges[i]);
