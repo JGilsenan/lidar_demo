@@ -40,6 +40,8 @@
 #include <deque>
 #include <cstdlib>
 #include <cmath>
+#include <tf/transform_broadcaster.h>
+#include <math.h>
 
 static int numSects = 360;
 static float matchDelta = 0.05;
@@ -62,9 +64,16 @@ double sampleSum = 0;
 bool freqKnown = false;
 bool queueFilled = false;
 
-void timerCallback(const ros::TimerEvent& e){
 
-}
+static int countNeeded = 5;
+int currentCount = 0;
+bool indexSet = false;
+scan_msg bestIndexScan;
+int bestMatchScore = 0;
+
+ros::Duration rotationTimeEstimate;
+double thetaEst = 0;
+
 
 int numMatchesFound(std::vector<float> scanA, std::vector<float> scanB){
 	int score = 0;
@@ -84,6 +93,21 @@ int getBestMatchIndex(const scan_msg& scan) {
 			bestIdx = i;
 		}
 	}
+
+	if(queueFilled && !indexSet) {
+		if(bestScore > bestMatchScore) {
+			std::cout << "possible index scan found!\n";
+			bestIndexScan = scan;
+			bestMatchScore = bestScore;
+			currentCount = 0;
+		} else {
+			currentCount++;
+			if (currentCount >= countNeeded) {
+				indexSet = true;
+			}
+		}
+	}
+
 	return bestIdx;
 }
 
@@ -144,36 +168,85 @@ void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 	if(isMatchTimeDeltaOutOfRange(bestMatchTimeDelta)) return;
 
 
-	double rotationTimeEstimate = updateRotationTimeEstimate(bestMatchTimeDelta);
+	double dRotationTimeEstimate = updateRotationTimeEstimate(bestMatchTimeDelta);
+	rotationTimeEstimate = ros::Duration(dRotationTimeEstimate);
 
-	std::cout << "estimated rotation duration: " << rotationTimeEstimate << std::endl;
+	std::cout << "estimated rotation duration: " << rotationTimeEstimate.toSec() << std::endl;
+
+	if(indexSet) {
+		double delt = (ros::Time::now() - bestIndexScan.timeReceived).toSec();
+		while(delt >= rotationTimeEstimate.toSec()){
+			delt -= rotationTimeEstimate.toSec();
+		}
+		thetaEst = (delt/rotationTimeEstimate.toSec())*(2*M_PI);
+		std::cout << "est time since index: " << delt << std::endl;
+		std::cout << "est theta since index: " << thetaEst << std::endl;
+	}
 }
 
 
-void lidar_demo::readParamsAndSetup(ros::NodeHandle *n){
+double yawTemp = 0;
+void timerCallback(const ros::TimerEvent& e){
 
+	tf::TransformBroadcaster baseToLaser;
+	tf::TransformBroadcaster worldToBase;
+
+	baseToLaser.sendTransform(
+			tf::StampedTransform(
+					tf::Transform(tf::createQuaternionFromRPY(0,0,M_PI/2),tf::Vector3(0,0,0)),
+							ros::Time::now(),
+							"base_link",
+							"laser"));
+
+	worldToBase.sendTransform(
+			tf::StampedTransform(
+					tf::Transform(tf::createQuaternionFromYaw(yawTemp),tf::Vector3(0,0,0)),
+							ros::Time::now(),
+							"world",
+							"base_link"));
+
+	double adj = (lidar_demo::node_rate/1000.0)*(2*M_PI);
+	yawTemp += adj;
+	if(yawTemp > (2*M_PI)){
+		yawTemp = 0;
+	}
+	std::cout << "Test yaw: " << yawTemp << std::endl;
+
+}
+
+void lidar_demo::readParamsAndSetup(ros::NodeHandle *n){
   if (n->hasParam("node_rate")){
     n->getParam("node_rate", node_rate);
     n->deleteParam("node_rate");
+    std::cout << "Parameter read: node_rate \n";
   } else {
     std::cout << "Parameter not found: node_rate \n";
   }
 
 }
 
-
 int main(int argc, char **argv){
 
   ros::init(argc, argv, "demo");
   ros::NodeHandle n;
   ros::NodeHandle nh("~");
-  lidar_demo::readParamsAndSetup(&n);
 
-  ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
+//  lidar_demo::readParamsAndSetup(&n);
+//  ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
+//  ros::Timer timer = n.createTimer(ros::Duration(lidar_demo::node_rate/1000.0), timerCallback);
+//  ros::spin();
 
-  ros::Timer timer = n.createTimer(ros::Duration(lidar_demo::node_rate), timerCallback);
+    ros::Rate r(100);
 
-  ros::spin();
+    tf::TransformBroadcaster broadcaster;
+
+    while(n.ok()){
+      broadcaster.sendTransform(
+        tf::StampedTransform(
+          tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0.1, 0.0, 0.2)),
+          ros::Time::now(),"world", "base_link"));
+      r.sleep();
+    }
 
   return 0;
 }
