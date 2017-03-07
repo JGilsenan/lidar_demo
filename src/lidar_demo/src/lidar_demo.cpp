@@ -184,10 +184,6 @@ void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 	}
 }
 
-
-double yawTemp = 0;
-
-
 void lidar_demo::readParamsAndSetup(ros::NodeHandle *n){
   if (n->hasParam("node_rate")){
     n->getParam("node_rate", node_rate);
@@ -199,6 +195,7 @@ void lidar_demo::readParamsAndSetup(ros::NodeHandle *n){
 
 }
 
+
 int main(int argc, char **argv){
 
   ros::init(argc, argv, "demo");
@@ -207,47 +204,30 @@ int main(int argc, char **argv){
 
   lidar_demo::readParamsAndSetup(&n);
 
-//  ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
+  ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
 
-    ros::Rate r(10);
+  ros::Rate r(100);
 
-    tf::TransformBroadcaster broadcaster;
+  tf::TransformBroadcaster baseToLaser;
+  tf::TransformBroadcaster worldToBase;
 
+	while(n.ok()){
+		baseToLaser.sendTransform(
+		tf::StampedTransform(
+			tf::Transform(tf::createQuaternionFromRPY(0,0,M_PI/2),tf::Vector3(0,0,0)),
+			ros::Time::now(),
+			"base_link",
+			"laser"));
 
-	tf::TransformBroadcaster baseToLaser;
-	tf::TransformBroadcaster worldToBase;
+		worldToBase.sendTransform(
+			tf::StampedTransform(
+			tf::Transform(tf::createQuaternionFromYaw(thetaEst),tf::Vector3(0,0,0)),
+			ros::Time::now(),
+			"world",
+			"base_link"));
 
-
-    while(n.ok()){
-//      broadcaster.sendTransform(
-//        tf::StampedTransform(
-//          tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0.1, 0.0, 0.2)),
-//          ros::Time::now(),"world", "base_link"));
-
-    	baseToLaser.sendTransform(
-    			tf::StampedTransform(
-    					tf::Transform(tf::createQuaternionFromRPY(0,0,M_PI/2),tf::Vector3(0,0,0)),
-    							ros::Time::now(),
-    							"base_link",
-    							"laser"));
-
-    	worldToBase.sendTransform(
-    			tf::StampedTransform(
-    					tf::Transform(tf::createQuaternionFromYaw(yawTemp),tf::Vector3(0,0,0)),
-    							ros::Time::now(),
-    							"world",
-    							"base_link"));
-
-    	double adj = (lidar_demo::node_rate/1000.0)*(2*M_PI);
-    	yawTemp += adj;
-    	if(yawTemp > (2*M_PI)){
-    		yawTemp = 0;
-    	}
-    	std::cout << "Test yaw: " << yawTemp << std::endl;
-
-
-      r.sleep();
-    }
+		r.sleep();
+	}
 
   return 0;
 }

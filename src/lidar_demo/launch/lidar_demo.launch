@@ -1,17 +1,14 @@
 <launch>
   <rosparam file="$(find lidar_demo)/lidar_demo_params.yaml" command="load" />
 
-  <!-- node pkg="lidar_demo" type="demo" name="demo" respawn="true" output="screen" / -->
+  <node pkg="tf" type="static_transform_publisher" name="base_to_laser" 
+    args="0.0 0.0 0 0 0 0 /map /world 40" /> 
+
+  <node pkg="lidar_demo" type="demo" name="demo" respawn="true" output="screen" />
 
   <node pkg="sicktoolbox_wrapper" type="sicklms" name="lidar" respawn="true" output="screen">
     <param name="port" value="/dev/ttyUSB0" />
     <param name="baud" value="38400" />
   </node>
   
-  <!-- node pkg="tf" type="static_transform_publisher" name="base_to_laser" 
-    args="0.0 0.0 0 0 0 1.5708 /base_link /laser 40" / --> 
-
-  <node pkg="tf" type="static_transform_publisher" name="world_to_base" 
-    args="0.0 0.0 0.0 0.0 0.0 0.0 /world /base_link 40" /> 
-
 </launch>
