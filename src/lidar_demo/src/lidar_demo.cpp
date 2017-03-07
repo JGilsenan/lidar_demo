@@ -186,9 +186,7 @@ void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 
 
 double yawTemp = 0;
-void timerCallback(const ros::TimerEvent& e){
-	//todo
-}
+
 
 void lidar_demo::readParamsAndSetup(ros::NodeHandle *n){
   if (n->hasParam("node_rate")){
@@ -207,12 +205,11 @@ int main(int argc, char **argv){
   ros::NodeHandle n;
   ros::NodeHandle nh("~");
 
-//  lidar_demo::readParamsAndSetup(&n);
-//  ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
-//  ros::Timer timer = n.createTimer(ros::Duration(lidar_demo::node_rate/1000.0), timerCallback);
-//  ros::spin();
+  lidar_demo::readParamsAndSetup(&n);
 
-    ros::Rate r(100);
+//  ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
+
+    ros::Rate r(10);
 
     tf::TransformBroadcaster broadcaster;
 
@@ -241,12 +238,12 @@ int main(int argc, char **argv){
     							"world",
     							"base_link"));
 
-    	double adj = (lidar_demo::node_rate/1000.0)*(2*M_PI);
-    	yawTemp += adj;
-    	if(yawTemp > (2*M_PI)){
-    		yawTemp = 0;
-    	}
-    	std::cout << "Test yaw: " << yawTemp << std::endl;
+//    	double adj = (lidar_demo::node_rate/1000.0)*(2*M_PI);
+//    	yawTemp += adj;
+//    	if(yawTemp > (2*M_PI)){
+//    		yawTemp = 0;
+//    	}
+//    	std::cout << "Test yaw: " << yawTemp << std::endl;
 
 
       r.sleep();
