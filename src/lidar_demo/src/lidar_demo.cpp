@@ -238,12 +238,12 @@ int main(int argc, char **argv){
     							"world",
     							"base_link"));
 
-//    	double adj = (lidar_demo::node_rate/1000.0)*(2*M_PI);
-//    	yawTemp += adj;
-//    	if(yawTemp > (2*M_PI)){
-//    		yawTemp = 0;
-//    	}
-//    	std::cout << "Test yaw: " << yawTemp << std::endl;
+    	double adj = (lidar_demo::node_rate/1000.0)*(2*M_PI);
+    	yawTemp += adj;
+    	if(yawTemp > (2*M_PI)){
+    		yawTemp = 0;
+    	}
+    	std::cout << "Test yaw: " << yawTemp << std::endl;
 
 
       r.sleep();
