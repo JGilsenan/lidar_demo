@@ -212,6 +212,8 @@ int main(int argc, char **argv){
   tf::TransformBroadcaster worldToBase;
 
 	while(n.ok()){
+		ros::spinOnce();
+
 		baseToLaser.sendTransform(
 		tf::StampedTransform(
 			tf::Transform(tf::createQuaternionFromRPY(0,0,M_PI/2),tf::Vector3(0,0,0)),
