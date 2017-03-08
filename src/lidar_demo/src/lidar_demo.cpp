@@ -43,33 +43,35 @@
 #include <tf/transform_broadcaster.h>
 #include <math.h>
 
-static int numSects = 360;
-static float matchDelta = 0.05;
-ros::Duration maxCollectDur(12.0);
-static double referenceEstimate = 9.0;
-static double throwOutDelta = 1.0;
-static int sampleSizeMax = 200;
 
 struct scan_msg {
 	ros::Time timeReceived;
 	std::vector<float> scan;
+	double thetaEstimate;
 };
 
+static int numSects = 360;
+static float matchDelta = 0.05;
+static double referenceEstimate = 9.0;
+static double throwOutDelta = 1.0;
+static int sampleSizeMax = 200;
 std::deque<scan_msg> scans;
-
 std::queue<double> sampleDurations;
 double sampleSum = 0;
-
 bool queueFilled = false;
-
 static int countNeeded = 5;
 int currentCount = 0;
 bool indexSet = false;
 scan_msg bestIndexScan;
 int bestMatchScore = 0;
-
 ros::Duration rotationTimeEstimate;
 double thetaEst = 0;
+ros::Duration maxCollectDur(12.0);
+
+
+
+std::list<scan_msg> scan_list;
+
 
 
 int numMatchesFound(std::vector<float> scanA, std::vector<float> scanB){
@@ -139,6 +141,9 @@ void cleanupQueue(const scan_msg& scan) {
 	}
 }
 
+
+
+
 void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
 	scan_msg scan;
@@ -150,10 +155,13 @@ void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 		}
 	}
 	scan.timeReceived = ros::Time::now();
+
+
+
+
+
+
 	scans.push_back(scan);
-
-
-
 	cleanupQueue(scan);
 	if(!queueFilled) return;
 
@@ -178,25 +186,12 @@ void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 	}
 }
 
-void lidar_demo::readParamsAndSetup(ros::NodeHandle *n){
-  if (n->hasParam("node_rate")){
-    n->getParam("node_rate", node_rate);
-    n->deleteParam("node_rate");
-    std::cout << "Parameter read: node_rate \n";
-  } else {
-    std::cout << "Parameter not found: node_rate \n";
-  }
-
-}
-
-
 int main(int argc, char **argv){
 
   ros::init(argc, argv, "demo");
   ros::NodeHandle n;
   ros::NodeHandle nh("~");
 
-  lidar_demo::readParamsAndSetup(&n);
 
   ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
 
@@ -217,7 +212,7 @@ int main(int argc, char **argv){
 
 		worldToBase.sendTransform(
 			tf::StampedTransform(
-			tf::Transform(tf::createQuaternionFromYaw(thetaEst),tf::Vector3(0,0,0)),
+			tf::Transform(tf::createQuaternionFromYaw(-1*thetaEst),tf::Vector3(0,0,0)),
 			ros::Time::now(),
 			"world",
 			"base_link"));
