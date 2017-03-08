@@ -56,14 +56,11 @@ struct scan_msg {
 };
 
 std::deque<scan_msg> scans;
-ros::Duration freq;
 
 std::queue<double> sampleDurations;
 double sampleSum = 0;
 
-bool freqKnown = false;
 bool queueFilled = false;
-
 
 static int countNeeded = 5;
 int currentCount = 0;
@@ -155,10 +152,7 @@ void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 	scan.timeReceived = ros::Time::now();
 	scans.push_back(scan);
 
-	if(!freqKnown && scans.size() > 1){
-		freqKnown = true;
-		freq = scan.timeReceived - scans.front().timeReceived;
-	}
+
 
 	cleanupQueue(scan);
 	if(!queueFilled) return;
@@ -216,7 +210,7 @@ int main(int argc, char **argv){
 
 		baseToLaser.sendTransform(
 		tf::StampedTransform(
-			tf::Transform(tf::createQuaternionFromRPY(0,0,M_PI/2),tf::Vector3(0,0,0)),
+			tf::Transform(tf::createQuaternionFromRPY(M_PI/2,0,M_PI/2),tf::Vector3(0,0,0)),
 			ros::Time::now(),
 			"base_link",
 			"laser"));
