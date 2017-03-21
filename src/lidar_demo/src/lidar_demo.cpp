@@ -43,11 +43,11 @@
 #include <tf/transform_broadcaster.h>
 #include <math.h>
 
-
 struct scan_msg {
-	ros::Time timeReceived;
-	std::vector<float> scan;
-	double thetaEstimate;
+  ros::Time timeReceived;
+  std::vector<float> scan;
+  std::vector<float> intens;
+  double thetaEstimate;
 };
 
 static int numSects = 360;
@@ -68,157 +68,140 @@ ros::Duration rotationTimeEstimate;
 double thetaEst = 0;
 ros::Duration maxCollectDur(12.0);
 
-
-
 std::list<scan_msg> scan_list;
 
-
-
-int numMatchesFound(std::vector<float> scanA, std::vector<float> scanB){
-	int score = 0;
-	for(int i = 0; i < scanA.size(); i++){
-		if(std::fabs(scanA[i]-scanB[i]) <= matchDelta) score++;
-	}
-	return score;
+int numMatchesFound(std::vector<float> scanA, std::vector<float> scanB) {
+  int score = 0;
+  for (int i = 0; i < scanA.size(); i++) {
+    if (std::fabs(scanA[i] - scanB[i]) <= matchDelta) score++;
+  }
+  return score;
 }
 
 int getBestMatchIndex(const scan_msg& scan) {
-	int bestScore = 0;
-	int bestIdx = 0;
-	for (int i = 0; i < scans.size() - 50; i++) {
-		int score = numMatchesFound(scan.scan, scans.at(i).scan);
-		if (score > bestScore) {
-			bestScore = score;
-			bestIdx = i;
-		}
-	}
+  int bestScore = 0;
+  int bestIdx = 0;
+  for (int i = 0; i < scans.size() - 50; i++) {
+    int score = numMatchesFound(scan.scan, scans.at(i).scan);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
 
-	if(queueFilled && !indexSet) {
-		if(bestScore > bestMatchScore) {
-			std::cout << "possible index scan found!\n";
-			bestIndexScan = scan;
-			bestMatchScore = bestScore;
-			currentCount = 0;
-		} else {
-			currentCount++;
-			if (currentCount >= countNeeded) {
-				indexSet = true;
-			}
-		}
-	}
+  if (queueFilled && !indexSet) {
+    if (bestScore > bestMatchScore) {
+      std::cout << "possible index scan found!\n";
+      bestIndexScan = scan;
+      bestMatchScore = bestScore;
+      currentCount = 0;
+    } else {
+      currentCount++;
+      if (currentCount >= countNeeded) {
+        indexSet = true;
+      }
+    }
+  }
 
-	return bestIdx;
+  return bestIdx;
 }
 
 bool isMatchTimeDeltaOutOfRange(const ros::Duration& bestMatchTimeDelta) {
-	bool deltaOutOfRange = false;
-	double refDeltDelt = referenceEstimate - bestMatchTimeDelta.toSec();
-	if (refDeltDelt < 0)
-		refDeltDelt = refDeltDelt * -1.0;
+  bool deltaOutOfRange = false;
+  double refDeltDelt = referenceEstimate - bestMatchTimeDelta.toSec();
+  if (refDeltDelt < 0) refDeltDelt = refDeltDelt * -1.0;
 
-	if (refDeltDelt > throwOutDelta)
-		deltaOutOfRange = true;
+  if (refDeltDelt > throwOutDelta) deltaOutOfRange = true;
 
-	return deltaOutOfRange;
+  return deltaOutOfRange;
 }
 
 double updateRotationTimeEstimate(const ros::Duration& bestMatchTimeDelta) {
-	sampleDurations.push(bestMatchTimeDelta.toSec());
-	sampleSum += bestMatchTimeDelta.toSec();
-	if (sampleDurations.size() > sampleSizeMax) {
-		double frontVal = sampleDurations.front();
-		sampleDurations.pop();
-		sampleSum -= frontVal;
-	}
-	return sampleSum / sampleDurations.size();
+  sampleDurations.push(bestMatchTimeDelta.toSec());
+  sampleSum += bestMatchTimeDelta.toSec();
+  if (sampleDurations.size() > sampleSizeMax) {
+    double frontVal = sampleDurations.front();
+    sampleDurations.pop();
+    sampleSum -= frontVal;
+  }
+  return sampleSum / sampleDurations.size();
 }
 
 void cleanupQueue(const scan_msg& scan) {
-	queueFilled = false;
-	while (scan.timeReceived - scans.front().timeReceived > maxCollectDur) {
-		scans.pop_front();
-		queueFilled = true;
-	}
+  queueFilled = false;
+  while (scan.timeReceived - scans.front().timeReceived > maxCollectDur) {
+    scans.pop_front();
+    queueFilled = true;
+  }
 }
 
+void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
+  scan_msg scan;
+  for (int i = 0; i < numSects; i++) {
+    if (std::isnan(msg->ranges[i]) || std::isinf(msg->ranges[i])) {
+      scan.scan.push_back(0);
+      scan.intens.push_back(0);
+    } else {
+      scan.scan.push_back(msg->ranges[i]);
+      scan.intens.push_back(msg->intensities[i]);
+      std::cout << "intens: " << scan.intens.back() << std::endl;
+    }
+  }
+  scan.timeReceived = ros::Time::now();
 
+  scans.push_back(scan);
+  cleanupQueue(scan);
+  if (!queueFilled) return;
 
+  int bestIdx = getBestMatchIndex(scan);
+  ros::Duration bestMatchTimeDelta = (scan.timeReceived
+      - scans.at(bestIdx).timeReceived);
+  if (isMatchTimeDeltaOutOfRange(bestMatchTimeDelta)) return;
 
-void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
-{
-	scan_msg scan;
-	for(int i = 0; i < numSects; i++){
-		if(std::isnan(msg->ranges[i]) || std::isinf(msg->ranges[i])){
-			scan.scan.push_back(0);
-		} else {
-			scan.scan.push_back(msg->ranges[i]);
-		}
-	}
-	scan.timeReceived = ros::Time::now();
+  double dRotationTimeEstimate = updateRotationTimeEstimate(bestMatchTimeDelta);
+  rotationTimeEstimate = ros::Duration(dRotationTimeEstimate);
 
+  std::cout << "estimated rotation duration: " << rotationTimeEstimate.toSec()
+      << std::endl;
 
-
-
-
-
-	scans.push_back(scan);
-	cleanupQueue(scan);
-	if(!queueFilled) return;
-
-	int bestIdx = getBestMatchIndex(scan);
-	ros::Duration bestMatchTimeDelta = (scan.timeReceived - scans.at(bestIdx).timeReceived);
-	if(isMatchTimeDeltaOutOfRange(bestMatchTimeDelta)) return;
-
-
-	double dRotationTimeEstimate = updateRotationTimeEstimate(bestMatchTimeDelta);
-	rotationTimeEstimate = ros::Duration(dRotationTimeEstimate);
-
-	std::cout << "estimated rotation duration: " << rotationTimeEstimate.toSec() << std::endl;
-
-	if(indexSet) {
-		double delt = (ros::Time::now() - bestIndexScan.timeReceived).toSec();
-		while(delt >= rotationTimeEstimate.toSec()){
-			delt -= rotationTimeEstimate.toSec();
-		}
-		thetaEst = (delt/rotationTimeEstimate.toSec())*(2*M_PI);
-		std::cout << "est time since index: " << delt << std::endl;
-		std::cout << "est theta since index: " << thetaEst << std::endl;
-	}
+  if (indexSet) {
+    double delt = (ros::Time::now() - bestIndexScan.timeReceived).toSec();
+    while (delt >= rotationTimeEstimate.toSec()) {
+      delt -= rotationTimeEstimate.toSec();
+    }
+    thetaEst = (delt / rotationTimeEstimate.toSec()) * (2 * M_PI);
+    std::cout << "est time since index: " << delt << std::endl;
+    std::cout << "est theta since index: " << thetaEst << std::endl;
+  }
 }
 
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
 
   ros::init(argc, argv, "demo");
   ros::NodeHandle n;
   ros::NodeHandle nh("~");
 
-
-  ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
-
   ros::Rate r(100);
 
+  ros::Subscriber laser_sub = n.subscribe("/scan", 1, laserScanCallback);
   tf::TransformBroadcaster baseToLaser;
   tf::TransformBroadcaster worldToBase;
 
-	while(n.ok()){
-		ros::spinOnce();
+  while (n.ok()) {
+    ros::spinOnce();
 
-		baseToLaser.sendTransform(
-		tf::StampedTransform(
-			tf::Transform(tf::createQuaternionFromRPY(M_PI/2,0,M_PI/2),tf::Vector3(0,0,0)),
-			ros::Time::now(),
-			"base_link",
-			"laser"));
+    baseToLaser.sendTransform(
+        tf::StampedTransform(
+            tf::Transform(tf::createQuaternionFromRPY(M_PI / 2, 0, M_PI / 2),
+                tf::Vector3(0, 0, 0)), ros::Time::now(), "base_link", "laser"));
 
-		worldToBase.sendTransform(
-			tf::StampedTransform(
-			tf::Transform(tf::createQuaternionFromYaw(-1*thetaEst),tf::Vector3(0,0,0)),
-			ros::Time::now(),
-			"world",
-			"base_link"));
+    worldToBase.sendTransform(
+        tf::StampedTransform(
+            tf::Transform(tf::createQuaternionFromYaw(-1 * thetaEst),
+                tf::Vector3(0, 0, 0)), ros::Time::now(), "world", "base_link"));
 
-		r.sleep();
-	}
+    r.sleep();
+  }
 
   return 0;
 }
