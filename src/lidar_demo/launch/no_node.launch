@@ -4,7 +4,7 @@
   <node pkg="tf" type="static_transform_publisher" name="base_to_laser" 
     args="0.0 0.0 0 0 0 0 /map /world 40" /> 
 
-  <node pkg="lidar_demo" type="demo" name="demo" respawn="true" output="screen" />
+  <!-- node pkg="lidar_demo" type="demo" name="demo" respawn="true" output="screen" / -->
 
   <node pkg="sicktoolbox_wrapper" type="sicklms" name="lidar" respawn="true" output="screen">
     <param name="port" value="/dev/ttyUSB0" />
